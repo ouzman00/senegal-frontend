@@ -8,18 +8,15 @@ import GeoJSON from "ol/format/GeoJSON";
 
 export default function MapEditor({
   map,
-  editableLayer, // VectorLayer
-  apiBaseUrl, // OBLIGATOIRE (env)
-  drawType = "Point", // "Point" | "Polygon"
+  editableLayer,
+  apiBaseUrl,
+  drawType = "Point",
   defaultName = "Nouvel objet",
 }) {
-  const [mode, setMode] = useState("none"); // none | draw | modify
+  const [mode, setMode] = useState("none");
   const [selectedId, setSelectedId] = useState(null);
   const geojson = useMemo(() => new GeoJSON(), []);
 
-  /* =======================
-     GARDE ABSOLUE
-  ======================= */
   if (!apiBaseUrl) {
     console.error("MapEditor: apiBaseUrl manquant");
     return (
@@ -29,9 +26,9 @@ export default function MapEditor({
     );
   }
 
-  /* =======================
-     SELECT (DELETE)
-  ======================= */
+  // =======================
+  // SELECT
+  // =======================
   useEffect(() => {
     if (!map || !editableLayer) return;
 
@@ -49,9 +46,9 @@ export default function MapEditor({
     return () => map.removeInteraction(select);
   }, [map, editableLayer]);
 
-  /* =======================
-     DRAW / MODIFY / SNAP
-  ======================= */
+  // =======================
+  // DRAW / MODIFY / SNAP
+  // =======================
   useEffect(() => {
     if (!map || !editableLayer) return;
 
@@ -62,7 +59,7 @@ export default function MapEditor({
     let modify = null;
     const snap = new Snap({ source });
 
-    /* -------- DRAW -------- */
+    // -------- DRAW --------
     if (mode === "draw") {
       draw = new Draw({ source, type: drawType });
 
@@ -74,10 +71,14 @@ export default function MapEditor({
           featureProjection: "EPSG:3857",
         });
 
+        // Envoyer un GeoJSON Feature
         const payload = {
-          nom: defaultName,
-          adresse: null,
-          geom: geo.geometry,
+          type: "Feature",
+          geometry: geo.geometry,
+          properties: {
+            nom: feature.get("nom") ?? defaultName,
+            adresse: feature.get("adresse") ?? null,
+          },
         };
 
         try {
@@ -90,9 +91,12 @@ export default function MapEditor({
           if (!res.ok) throw new Error(`POST HTTP ${res.status}`);
 
           const created = await res.json();
+
           feature.setId(created.id);
-          feature.set("nom", created.nom ?? defaultName);
-          feature.set("adresse", created.adresse ?? null);
+
+          const props = created.properties ?? created;
+          feature.set("nom", props.nom ?? defaultName);
+          feature.set("adresse", props.adresse ?? null);
         } catch (err) {
           console.error("MapEditor POST:", err);
           source.removeFeature(feature);
@@ -101,7 +105,7 @@ export default function MapEditor({
       });
     }
 
-    /* -------- MODIFY -------- */
+    // -------- MODIFY --------
     if (mode === "modify") {
       modify = new Modify({ source });
 
@@ -115,11 +119,21 @@ export default function MapEditor({
             featureProjection: "EPSG:3857",
           });
 
+          // ✅ PATCH en Feature (robuste) — plus d'accolade en trop ici
+          const payload = {
+            type: "Feature",
+            geometry: geo.geometry,
+            properties: {
+              nom: feature.get("nom") ?? defaultName,
+              adresse: feature.get("adresse") ?? null,
+            },
+          };
+
           try {
             const res = await fetch(`${apiBaseUrl}${id}/`, {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ geom: geo.geometry }),
+              body: JSON.stringify(payload),
             });
 
             if (!res.ok) throw new Error(`PATCH HTTP ${res.status}`);
@@ -142,9 +156,9 @@ export default function MapEditor({
     };
   }, [map, editableLayer, mode, apiBaseUrl, geojson, drawType, defaultName]);
 
-  /* =======================
-     DELETE
-  ======================= */
+  // =======================
+  // DELETE
+  // =======================
   const deleteSelected = async () => {
     if (!editableLayer || !selectedId) {
       alert("Sélectionne un objet");
@@ -156,12 +170,12 @@ export default function MapEditor({
         method: "DELETE",
       });
 
-      if (!res.ok && res.status !== 204)
+      if (!res.ok && res.status !== 204) {
         throw new Error(`DELETE HTTP ${res.status}`);
+      }
 
-      editableLayer.getSource().removeFeature(
-        editableLayer.getSource().getFeatureById(selectedId)
-      );
+      const src = editableLayer.getSource();
+      src.removeFeature(src.getFeatureById(selectedId));
       setSelectedId(null);
     } catch (err) {
       console.error("MapEditor DELETE:", err);
@@ -169,9 +183,6 @@ export default function MapEditor({
     }
   };
 
-  /* =======================
-     UI
-  ======================= */
   return (
     <div className="p-3 bg-white border border-gray-300 rounded-lg shadow flex flex-col gap-2">
       <div className="font-semibold">
@@ -197,10 +208,7 @@ export default function MapEditor({
           Modify
         </button>
 
-        <button
-          className="px-3 py-1 rounded bg-red-200"
-          onClick={deleteSelected}
-        >
+        <button className="px-3 py-1 rounded bg-red-200" onClick={deleteSelected}>
           Delete
         </button>
       </div>
