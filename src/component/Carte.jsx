@@ -66,7 +66,7 @@ export default function Carte({ hopitauxData, ecolesData }) {
 
   const [visibleLayers, setVisibleLayers] = useState({
     Regions: true,
-    Communes: false,
+    Communes: true,
     hopitaux: true,
     ecoles: false,
   });
