@@ -3,12 +3,14 @@ import "ol/ol.css";
 import { Map, View } from "ol";
 import TileLayer from "ol/layer/Tile";
 import VectorLayer from "ol/layer/Vector";
+import VectorSource from "ol/source/Vector";
 import OSM from "ol/source/OSM";
 import XYZ from "ol/source/XYZ";
-import VectorSource from "ol/source/Vector";
 import GeoJSON from "ol/format/GeoJSON";
 import { fromLonLat } from "ol/proj";
 import { Style, Stroke, Fill, Circle as CircleStyle } from "ol/style";
+
+import { getApiBaseUrl } from "../utils/api";
 
 import Coordonnees from "./Coordonnees";
 import MapEditor from "./MapEditor";
@@ -18,38 +20,23 @@ import Mesures from "./Mesures";
 import Echelle from "./Echelle";
 import Recherche from "./Recherche";
 
-const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL ||
-  (import.meta.env.DEV ? "http://127.0.0.1:8000" : "")
-).replace(/\/$/, "");
+function withBase(path) {
+  // utile si ton app est servie dans un sous-dossier (rare sur Vercel, mais safe)
+  const base = import.meta.env.BASE_URL || "/";
+  const cleanBase = base.endsWith("/") ? base.slice(0, -1) : base;
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  return `${cleanBase}${cleanPath}`;
+}
 
-function normalizeGeoJSON(input) {
-  if (!input) return null;
-
-  // DRF pagination: { count, next, previous, results: [...] }
-  if (input.results && Array.isArray(input.results)) {
-    return { type: "FeatureCollection", features: input.results };
-  }
-
-  // List: [...]
-  if (Array.isArray(input)) {
-    return { type: "FeatureCollection", features: input };
-  }
-
-  // Already FeatureCollection
-  if (input.type === "FeatureCollection" && Array.isArray(input.features)) {
-    return input;
-  }
-
-  // Could be a single Feature
-  if (input.type === "Feature") {
-    return { type: "FeatureCollection", features: [input] };
-  }
-
-  return null;
+async function fetchStaticGeoJSON(url) {
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`HTTP ${res.status} (${url})`);
+  return res.json();
 }
 
 export default function Carte({ hopitauxData, ecolesData }) {
+  const API_BASE_URL = useMemo(() => getApiBaseUrl(), []);
+
   const mapRef = useRef(null);
   const [map, setMap] = useState(null);
 
@@ -71,19 +58,19 @@ export default function Carte({ hopitauxData, ecolesData }) {
     ecoles: false,
   });
 
-  const [baseMapType, setBaseMapType] = useState("osm");
-  const [selectedFeature, setSelectedFeature] = useState(null);
-
   const visibleLayersRef = useRef(visibleLayers);
   useEffect(() => {
     visibleLayersRef.current = visibleLayers;
   }, [visibleLayers]);
 
+  const [baseMapType, setBaseMapType] = useState("osm");
+  const [selectedFeature, setSelectedFeature] = useState(null);
+
   const layerConfigs = useMemo(
     () => [
       {
         id: "Regions",
-        url: "/donnees_shp/regions.geojson",
+        url: withBase("/donnees_shp/regions.geojson"),
         color: "#1E0F1C",
         width: 3,
         fill: "rgba(255,0,0,0)",
@@ -91,7 +78,7 @@ export default function Carte({ hopitauxData, ecolesData }) {
       },
       {
         id: "Communes",
-        url: "/donnees_shp/communes.geojson",
+        url: withBase("/donnees_shp/Communes.geojson"),
         color: "#A7001E",
         width: 1,
         fill: "rgba(255,0,0,0)",
@@ -168,33 +155,24 @@ export default function Carte({ hopitauxData, ecolesData }) {
   }, []);
 
   // =======================
-  // LOAD STATIC GEOJSON
+  // LOAD STATIC GEOJSON (Regions/Communes)
   // =======================
   useEffect(() => {
     if (!map) return;
 
     let cancelled = false;
 
-    const loadStatic = async (config) => {
-      const res = await fetch(config.url, { cache: "no-store" });
-      if (!res.ok) throw new Error(`GeoJSON ${config.id} HTTP ${res.status} (${config.url})`);
-      const json = await res.json();
+    const buildVectorLayer = (features, cfg) => {
+      features.forEach((f) => f.set("layerName", cfg.name));
 
-      const feats = new GeoJSON().readFeatures(json, {
-        dataProjection: "EPSG:4326",
-        featureProjection: "EPSG:3857",
-      });
-
-      feats.forEach((f) => f.set("layerName", config.name));
-
-      const source = new VectorSource({ features: feats });
+      const source = new VectorSource({ features });
 
       const layer = new VectorLayer({
         source,
-        visible: !!visibleLayersRef.current[config.id],
+        visible: !!visibleLayersRef.current[cfg.id],
         style: new Style({
-          stroke: new Stroke({ color: config.color, width: config.width ?? 2 }),
-          fill: config.fill ? new Fill({ color: config.fill }) : undefined,
+          stroke: new Stroke({ color: cfg.color, width: cfg.width ?? 2 }),
+          fill: cfg.fill ? new Fill({ color: cfg.fill }) : undefined,
         }),
       });
 
@@ -203,6 +181,7 @@ export default function Carte({ hopitauxData, ecolesData }) {
 
     (async () => {
       try {
+        // Remove old static layers
         const oldRegions = staticLayersRef.current.Regions;
         const oldCommunes = staticLayersRef.current.Communes;
         if (oldRegions) map.removeLayer(oldRegions);
@@ -211,21 +190,34 @@ export default function Carte({ hopitauxData, ecolesData }) {
         const created = {};
 
         for (const cfg of layerConfigs) {
-          const { layer, source } = await loadStatic(cfg);
-          if (cancelled) return;
+          try {
+            const json = await fetchStaticGeoJSON(cfg.url);
+            if (cancelled) return;
 
-          map.addLayer(layer);
-          created[cfg.id] = layer;
+            const feats = new GeoJSON().readFeatures(json, {
+              dataProjection: "EPSG:4326",
+              featureProjection: "EPSG:3857",
+            });
 
-          if (cfg.id === "Regions") {
-            const extent = source.getExtent();
-            if (extent && extent.every(Number.isFinite)) {
-              map.getView().fit(extent, {
-                padding: [50, 50, 50, 50],
-                maxZoom: 10,
-                duration: 500,
-              });
+            const { layer, source } = buildVectorLayer(feats, cfg);
+
+            map.addLayer(layer);
+            created[cfg.id] = layer;
+
+            // fit on regions
+            if (cfg.id === "Regions") {
+              const extent = source.getExtent();
+              if (extent && extent.every(Number.isFinite)) {
+                map.getView().fit(extent, {
+                  padding: [50, 50, 50, 50],
+                  maxZoom: 10,
+                  duration: 500,
+                });
+              }
             }
+          } catch (e) {
+            // ✅ ne casse pas toute la carte si un fichier manque
+            console.error(`Erreur chargement couche ${cfg.id}:`, e);
           }
         }
 
@@ -263,14 +255,15 @@ export default function Carte({ hopitauxData, ecolesData }) {
 
     if (layers.hopitaux) map.removeLayer(layers.hopitaux);
 
-    const geojson = normalizeGeoJSON(hopitauxData);
-    if (!geojson?.features?.length) return;
+    if (!hopitauxData?.features?.length) {
+      console.warn("Hopitaux FeatureCollection vide:", hopitauxData);
+      return;
+    }
 
-    const feats = new GeoJSON().readFeatures(geojson, {
+    const feats = new GeoJSON().readFeatures(hopitauxData, {
       dataProjection: "EPSG:4326",
       featureProjection: "EPSG:3857",
     });
-
     feats.forEach((f) => f.set("layerName", "Hôpitaux"));
 
     const source = new VectorSource({ features: feats });
@@ -290,7 +283,6 @@ export default function Carte({ hopitauxData, ecolesData }) {
     map.addLayer(layer);
     setLayers((prev) => ({ ...prev, hopitaux: layer }));
 
-    // ✅ Zoom automatique sur les hôpitaux (utile si points hors écran)
     const extent = source.getExtent();
     if (extent && extent.every(Number.isFinite)) {
       map.getView().fit(extent, {
@@ -309,14 +301,15 @@ export default function Carte({ hopitauxData, ecolesData }) {
 
     if (layers.ecoles) map.removeLayer(layers.ecoles);
 
-    const geojson = normalizeGeoJSON(ecolesData);
-    if (!geojson?.features?.length) return;
+    if (!ecolesData?.features?.length) {
+      console.warn("Ecoles FeatureCollection vide:", ecolesData);
+      return;
+    }
 
-    const feats = new GeoJSON().readFeatures(geojson, {
+    const feats = new GeoJSON().readFeatures(ecolesData, {
       dataProjection: "EPSG:4326",
       featureProjection: "EPSG:3857",
     });
-
     feats.forEach((f) => f.set("layerName", "Écoles"));
 
     const source = new VectorSource({ features: feats });
@@ -368,6 +361,7 @@ export default function Carte({ hopitauxData, ecolesData }) {
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="w-60 p-4 bg-white rounded-lg shadow-md border border-gray-300 sticky top-4 h-fit">
             <h3 className="font-semibold mb-2">Légende</h3>
+
             <ul className="flex flex-col gap-2">
               {[
                 { id: "Regions", name: "Régions", color: "#1E0F1C" },
@@ -397,7 +391,10 @@ export default function Carte({ hopitauxData, ecolesData }) {
           </div>
 
           <div className="flex-1 relative">
-            <div ref={mapRef} className="w-full h-[700px] sm:h-[850px] rounded-lg border border-gray-400" />
+            <div
+              ref={mapRef}
+              className="w-full h-[700px] sm:h-[850px] rounded-lg border border-gray-400"
+            />
 
             <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50">
               <Recherche map={map} />
@@ -443,7 +440,9 @@ export default function Carte({ hopitauxData, ecolesData }) {
               />
             )}
 
-            <RegionChart selectedRegion={selectedFeature?.nom || selectedFeature?.NOM || null} />
+            <RegionChart
+              selectedRegion={selectedFeature?.nom || selectedFeature?.NOM || null}
+            />
           </div>
         </div>
       </div>

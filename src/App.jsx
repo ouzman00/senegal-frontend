@@ -1,15 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import "./App.css";
 import Carte from "./component/Carte";
+import { fetchGeoJSON, getApiBaseUrl } from "./utils/api";
 
 export default function App() {
-  const API_BASE_URL = useMemo(() => {
-    const base =
-      import.meta.env.VITE_API_BASE_URL ||
-      (import.meta.env.DEV ? "http://127.0.0.1:8000" : "");
-    return (base || "").replace(/\/$/, "");
-  }, []);
-
+  const API_BASE_URL = useMemo(() => getApiBaseUrl(), []);
   const [hopitauxData, setHopitauxData] = useState(null);
   const [ecolesData, setEcolesData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -17,38 +12,31 @@ export default function App() {
 
   useEffect(() => {
     if (!API_BASE_URL) {
-      setError("VITE_API_BASE_URL n'est pas défini (prod).");
+      setError("VITE_API_BASE_URL n'est pas défini en production.");
       setLoading(false);
       return;
     }
 
     const abort = new AbortController();
 
-    const fetchGeojson = async (url, label, optional = false) => {
-      const res = await fetch(url, { signal: abort.signal, cache: "no-store" });
-      if (!res.ok) {
-        const msg = `${label} HTTP ${res.status} (${url})`;
-        if (optional) return null;
-        throw new Error(msg);
-      }
-      return res.json();
-    };
-
     (async () => {
       try {
         setLoading(true);
         setError(null);
 
-        const hop = await fetchGeojson(`${API_BASE_URL}/api/hopitaux/`, "Hopitaux");
-        const eco = await fetchGeojson(`${API_BASE_URL}/api/ecoles/`, "Ecoles", true);
+        const hopUrl = `${API_BASE_URL}/api/hopitaux/?page_size=1000`;
+        const ecoUrl = `${API_BASE_URL}/api/ecoles/?page_size=1000`;
+
+        const hop = await fetchGeoJSON(hopUrl, { signal: abort.signal });
+        const eco = await fetchGeoJSON(ecoUrl, { signal: abort.signal });
 
         setHopitauxData(hop);
         setEcolesData(eco);
+
+        console.log("Hopitaux features:", hop?.features?.length ?? 0);
+        console.log("Ecoles features:", eco?.features?.length ?? 0);
       } catch (err) {
-        if (err.name !== "AbortError") {
-          console.error("Erreur API :", err);
-          setError(err.message || "Erreur inconnue");
-        }
+        if (err.name !== "AbortError") setError(err.message || "Erreur inconnue");
       } finally {
         setLoading(false);
       }
