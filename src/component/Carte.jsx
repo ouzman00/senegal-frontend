@@ -10,6 +10,8 @@ import GeoJSON from "ol/format/GeoJSON";
 import { fromLonLat } from "ol/proj";
 import { Style, Stroke, Fill, Circle as CircleStyle } from "ol/style";
 import { getArea } from "ol/sphere";
+import { boundingExtent } from "ol/extent";
+import { transformExtent } from "ol/proj";
 
 import { getApiBaseUrl } from "../utils/api";
 
@@ -38,11 +40,11 @@ function makeStyle(def) {
   if (def.kind === "point") {
     return new Style({
       image: new CircleStyle({
-        radius: def.radius ?? 6,
+        radius: def.radius ?? 9,              // ✅ plus gros
         fill: new Fill({ color: def.pointFill ?? "#00FF00" }),
         stroke: new Stroke({
-          color: def.pointStroke ?? "#000",
-          width: def.pointStrokeWidth ?? 1,
+          color: def.pointStroke ?? "#111",   // ✅ plus visible
+          width: def.pointStrokeWidth ?? 2,
         }),
       }),
     });
@@ -52,6 +54,7 @@ function makeStyle(def) {
     fill: def.fill ? new Fill({ color: def.fill }) : undefined,
   });
 }
+
 
 function buildVectorLayerFromFC(fc, def) {
   if (!fc?.features?.length) return null;
@@ -217,6 +220,7 @@ export default function Carte({ data }) {
     });
 
     setMap(mapInstance);
+    setTimeout(() => mapInstance.updateSize(), 0);
     return () => mapInstance.setTarget(undefined);
   }, []);
 
@@ -243,22 +247,25 @@ export default function Carte({ data }) {
           if (!built) continue;
 
           map.addLayer(built.layer);
+          console.log("Added", def.id, "OL feats =", built.source.getFeatures().length);
 
           // ✅ visibilité ici: mets l'état actuel si dispo sinon default
           const vis = (def.id in visibleLayers) ? !!visibleLayers[def.id] : !!def.visibleDefault;
           built.layer.setVisible(vis);
 
-          // ✅ fit une seule fois (si couche visible)
-          if (def.fitOnLoad && vis && !fittedRef.current.has(def.id)) {
-            const extent = built.source.getExtent();
-            if (extent && extent.every(Number.isFinite)) {
-              map.getView().fit(extent, {
-                padding: [50, 50, 50, 50],
-                maxZoom: def.fitOnLoad.maxZoom ?? 14,
-                duration: def.fitOnLoad.duration ?? 700,
-              });
-              fittedRef.current.add(def.id);
-            }
+          // ✅ Fit une seule fois: vue Sénégal (évite le point en France qui casse l'extent)
+          if (def.id === "hopitaux" && vis && !fittedRef.current.has("SENEGAL_VIEW")) {
+            // bbox Sénégal approx en lon/lat
+            const extent4326 = [-17.55, 12.25, -11.35, 16.70];
+            const extent3857 = transformExtent(extent4326, "EPSG:4326", "EPSG:3857");
+            map.getView().fit(extent3857, {
+              padding: [50, 50, 50, 50],
+              maxZoom: 10,
+              duration: 700,
+            });
+            fittedRef.current.add("SENEGAL_VIEW");
+          }
+
           }
         } catch (e) {
           console.error(`Erreur chargement couche ${def.id}:`, e);

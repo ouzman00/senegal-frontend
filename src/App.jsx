@@ -48,11 +48,15 @@ export default function App() {
           if (r.status === "fulfilled") {
             const [id, fc] = r.value;
             obj[id] = fc;
-            console.log(`${id} features:`, fc?.features?.length ?? 0);
+            console.log(`${id} fc features:`, fc?.features?.length ?? 0);
           } else {
             failed.push(r.reason?.message || String(r.reason));
           }
         }
+
+        console.log("DATA keys =", Object.keys(obj));
+        console.log("HOP sample =", obj.hopitaux?.features?.[0]);
+        console.log("ECO sample =", obj.ecoles?.features?.[0]);
 
         setData(obj);
 
