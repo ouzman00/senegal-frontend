@@ -13,13 +13,13 @@ export default function App() {
     () => [
       { id: "hopitaux", path: "/api/hopitaux/?page_size=2000" },
       { id: "ecoles", path: "/api/ecoles/?page_size=2000" },
-      // { id: "pharmacies", path: "/api/pharmacies/?page_size=5000" },
-      // { id: "boutiques", path: "/api/boutiques/?page_size=5000" },
     ],
     []
   );
 
   useEffect(() => {
+    console.log("API_BASE_URL =", API_BASE_URL);
+
     if (!API_BASE_URL) {
       setError("VITE_API_BASE_URL n'est pas défini en production.");
       setLoading(false);

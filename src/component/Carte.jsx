@@ -96,10 +96,9 @@ export default function Carte({ data }) {
   const [selectedFeature, setSelectedFeature] = useState(null);
   const [baseMapType, setBaseMapType] = useState("osm");
 
-  // ✅ Fit une seule fois par couche (sinon l’échelle bouge)
+  // Fit une seule fois par couche
   const fittedRef = useRef(new Set());
 
-  // ✅ Une seule config pour tout
   const LAYER_DEFS = useMemo(
     () => [
       {
@@ -130,6 +129,8 @@ export default function Carte({ data }) {
         source: { type: "data", key: "hopitaux" },
         pointFill: "#00FF00",
         visibleDefault: true,
+        // ✅ important: fit sur les points importés
+        fitOnLoad: { maxZoom: 12, duration: 500 },
       },
       {
         id: "ecoles",
@@ -140,12 +141,13 @@ export default function Carte({ data }) {
         width: 2,
         fill: "rgba(29,78,216,0.15)",
         visibleDefault: false,
+        // ✅ fit sur les polygones
+        fitOnLoad: { maxZoom: 10, duration: 500 },
       },
     ],
     []
   );
 
-  // ✅ visibilité auto
   const [visibleLayers, setVisibleLayers] = useState(() => {
     const init = {};
     for (const d of LAYER_DEFS) init[d.id] = !!d.visibleDefault;
@@ -163,9 +165,7 @@ export default function Carte({ data }) {
     [LAYER_DEFS]
   );
 
-  // =======================
   // INIT MAP
-  // =======================
   useEffect(() => {
     if (!mapRef.current) return;
 
@@ -193,7 +193,6 @@ export default function Carte({ data }) {
       }),
     });
     highlightLayer.set("id", "highlight");
-
     mapInstance.addLayer(highlightLayer);
 
     mapInstance.on("singleclick", (evt) => {
@@ -221,9 +220,7 @@ export default function Carte({ data }) {
     return () => mapInstance.setTarget(undefined);
   }, []);
 
-  // =======================
-  // LOAD / UPDATE layers (sans dépendre de visibleLayers)
-  // =======================
+  // LOAD / UPDATE layers : dépend seulement de map + data + defs
   useEffect(() => {
     if (!map) return;
 
@@ -235,11 +232,9 @@ export default function Carte({ data }) {
           removeLayerById(map, def.id);
 
           let fc = null;
-
           if (def.source.type === "static") {
-            const json = await fetchStaticGeoJSON(def.source.url);
+            fc = await fetchStaticGeoJSON(def.source.url);
             if (cancelled) return;
-            fc = json;
           } else {
             fc = data?.[def.source.key] ?? null;
           }
@@ -249,11 +244,12 @@ export default function Carte({ data }) {
 
           map.addLayer(built.layer);
 
-          // visibilité après ajout
-          built.layer.setVisible(!!visibleLayers[def.id]);
+          // ✅ visibilité ici: mets l'état actuel si dispo sinon default
+          const vis = (def.id in visibleLayers) ? !!visibleLayers[def.id] : !!def.visibleDefault;
+          built.layer.setVisible(vis);
 
-          // fit une seule fois
-          if (def.fitOnLoad && !fittedRef.current.has(def.id)) {
+          // ✅ fit une seule fois (si couche visible)
+          if (def.fitOnLoad && vis && !fittedRef.current.has(def.id)) {
             const extent = built.source.getExtent();
             if (extent && extent.every(Number.isFinite)) {
               map.getView().fit(extent, {
@@ -273,11 +269,9 @@ export default function Carte({ data }) {
     return () => {
       cancelled = true;
     };
-  }, [map, data, LAYER_DEFS, visibleLayers]);
+  }, [map, data, LAYER_DEFS]); // ✅ visibleLayers retiré
 
-  // =======================
-  // APPLY VISIBILITY only (pas de reload)
-  // =======================
+  // APPLY VISIBILITY only
   useEffect(() => {
     if (!map) return;
     map.getLayers().forEach((lyr) => {
@@ -287,9 +281,6 @@ export default function Carte({ data }) {
     });
   }, [map, visibleLayers]);
 
-  // =======================
-  // Regions chart data (depuis la couche Regions)
-  // =======================
   const regionsData = useMemo(() => {
     if (!map) return [];
     const regLayer = map.getLayers().getArray().find((l) => l.get?.("id") === "Regions");
@@ -300,21 +291,16 @@ export default function Carte({ data }) {
     return src.getFeatures().map((f) => {
       const p = f.getProperties?.() || {};
       const name = p.nom || p.NOM || p.name || p.NAME || "Région";
-      const sup =
-        Number(p.superficie || p.SUPERFICIE || p.area || 0) || areaKm2FromFeature3857(f);
+      const sup = Number(p.superficie || p.SUPERFICIE || p.area || 0) || areaKm2FromFeature3857(f);
       return { name, superficie: sup };
     });
   }, [map, data]);
 
-  // hopitaux layer for editor
   const hopLayer = useMemo(() => {
     if (!map) return null;
     return map.getLayers().getArray().find((l) => l.get?.("id") === "hopitaux") || null;
   }, [map, data]);
 
-  // =======================
-  // UI helpers
-  // =======================
   const toggleLayer = (id) => setVisibleLayers((p) => ({ ...p, [id]: !p[id] }));
 
   const changeBaseMap = (type) => {
@@ -415,7 +401,7 @@ export default function Carte({ data }) {
               <MapEditor
                 map={map}
                 editableLayer={hopLayer}
-                apiBaseUrl={`${API_BASE_URL}/api/hopitaux`}
+                apiBaseUrl={`${API_BASE_URL}/api/hopitaux/`}  // ✅ slash final
               />
             )}
 
