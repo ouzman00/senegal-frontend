@@ -10,23 +10,10 @@ staticfiles/
 
 # Node / Front
 node_modules/
+dist/
+build/
 
 # OS / IDE
 .vscode/
 .idea/
 .DS_Store
-
-# Données SIG (IMPORTANT)
-*.shp
-*.shx
-*.dbf
-*.prj
-*.cpg
-*.gpkg
-*.geojson
-*.zip
-*.tif
-
-# Windows
-AppData/
-NTUSER.*
