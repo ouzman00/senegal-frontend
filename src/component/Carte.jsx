@@ -163,7 +163,7 @@ export default function Carte({ dataByLayer }) {
       },
       {
         id: "Communes",
-        url: withBase("/donnees_shp/Communes.geojson"),
+        url: withBase("/donnees_shp/communes.geojson"),
         color: "#A7001E",
         width: 1,
         fill: "rgba(255,0,0,0)",
