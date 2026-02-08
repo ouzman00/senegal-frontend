@@ -77,7 +77,7 @@ const DYNAMIC_LAYERS = [
     fitOnLoad: false,
   },
   {
-    id: "Commerces",
+    id: "commerces",
     name: "Commerce",
     legendColor: "#7C3AED",
     legendType: "line",
