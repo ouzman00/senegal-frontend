@@ -88,6 +88,14 @@ const DYNAMIC_LAYERS = [
       }),
     fitOnLoad: false,
   },
+
+  {
+    id: "boutique",
+    name: "Boutique",
+    legendColor: "#7C3AED",
+    legendType: "point",
+    fitOnLoad: false,
+  },
   // ➕ demain: ajouter ici une nouvelle couche
 ];
 
