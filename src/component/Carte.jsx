@@ -96,6 +96,13 @@ const DYNAMIC_LAYERS = [
     legendType: "point",
     fitOnLoad: false,
   },
+  {
+    id: "points",
+    name: "Eoliennes",
+    legendColor: "#073bd3",
+    legendType: "point",
+    fitOnLoad: false,
+  },
   // ➕ demain: ajouter ici une nouvelle couche
 ];
 

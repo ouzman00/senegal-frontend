@@ -10,6 +10,7 @@ const API_LAYERS = [
   { id: "parcelles", endpoint: "/api/parcelles/?page_size=1000" },
   { id: "commerces", endpoint: "/api/commerces/?page_size=1000" },
   { id: "boutique", endpoint: "/api/boutique/?page_size=1000" },
+  { id: "points", endpoint: "/api/points/?page_size=1000" },
 
   // ➕ demain: { id: "pharmacies", endpoint: "/api/pharmacies/?page_size=1000" },
 ];
