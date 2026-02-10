@@ -5,13 +5,13 @@ import { fetchGeoJSON, getApiBaseUrl } from "./utils/api";
 
 // ✅ 1 config = 1 couche API
 const API_LAYERS = [
-  { id: "hopitaux", endpoint: "/api/hopitaux/?page_size=1000" },
-  { id: "ecoles", endpoint: "/api/ecoles/?page_size=1000" },
-  { id: "parcelles", endpoint: "/api/parcelles/?page_size=1000" },
-  { id: "commerces", endpoint: "/api/commerces/?page_size=1000" },
-  { id: "boutique", endpoint: "/api/boutique/?page_size=1000" },
-  { id: "points", endpoint: "/api/points/?page_size=1000" },
-  { id: "za", endpoint: "/api/za/?page_size=1000" },
+  { id: "hopitaux", endpoint: "/api/hopitaux/?page_size=100" },
+  { id: "ecoles", endpoint: "/api/ecoles/?page_size=100" },
+  { id: "parcelles", endpoint: "/api/parcelles/?page_size=100" },
+  { id: "commerces", endpoint: "/api/commerces/?page_size=100" },
+  { id: "boutique", endpoint: "/api/boutique/?page_size=100" },
+  { id: "points", endpoint: "/api/points/?page_size=100" },
+  { id: "za", endpoint: "/api/za/?page_size=100" },
 
   // ➕ demain: { id: "pharmacies", endpoint: "/api/pharmacies/?page_size=1000" },
 ];
