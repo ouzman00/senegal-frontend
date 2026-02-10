@@ -103,6 +103,18 @@ const DYNAMIC_LAYERS = [
     legendType: "point",
     fitOnLoad: false,
   },
+  {
+    id: "za",
+    name: "Zone activité",
+    legendColor: "#86EFAC",
+    legendType: "line",
+    style: () =>
+      new Style({
+        stroke: new Stroke({ color: "#86EFAC", width: 2 }),
+        fill: new Fill({ color: "rgba(29,78,216,0.15)" }),
+      }),
+    fitOnLoad: false,
+  },
   // ➕ demain: ajouter ici une nouvelle couche
 ];
 
