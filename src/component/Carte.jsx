@@ -88,14 +88,6 @@ const DYNAMIC_LAYERS = [
       }),
     fitOnLoad: false,
   },
-
-  {
-    id: "boutique",
-    name: "Boutique",
-    legendColor: "#7C3AED",
-    legendType: "point",
-    fitOnLoad: false,
-  },
   {
     id: "points",
     name: "Eoliennes",
@@ -115,6 +107,19 @@ const DYNAMIC_LAYERS = [
       }),
     fitOnLoad: false,
   },
+  {
+    id: "zaer",
+    name: "ZAER",
+    legendColor: "#1E3A8A",
+    legendType: "line",
+    style: () =>
+      new Style({
+        stroke: new Stroke({ color: "#1E3A8A", width: 2 }),
+        fill: new Fill({ color: "rgba(29,78,216,0.15)" }),
+      }),
+    fitOnLoad: false,
+  },
+
   // ➕ demain: ajouter ici une nouvelle couche
 ];
 
