@@ -9,7 +9,6 @@ const API_LAYERS = [
   { id: "ecoles", endpoint: "/api/ecoles/?page_size=100" },
   { id: "parcelles", endpoint: "/api/parcelles/?page_size=100" },
   { id: "commerces", endpoint: "/api/commerces/?page_size=100" },
-  { id: "boutique", endpoint: "/api/boutique/?page_size=100" },
   { id: "points", endpoint: "/api/points/?page_size=100" },
   { id: "za", endpoint: "/api/za/?page_size=100" },
   { id: "zaer", endpoint: "/api/zaer/?page_size=100" },
